@@ -1,38 +1,84 @@
-import { useEffect, useState } from 'react';
-import { getEvents } from '../api.js';
-import { useCart } from '../CartContext.jsx';
-import { formatMoney } from '../money.js';
-
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { getEvents } from "../api.js";
+import { formatMoney } from "../money.js";
 
 export default function Events() {
   const [events, setEvents] = useState([]);
-  const [error, setError] = useState('');
-  const { addToCart } = useCart();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    getEvents().then(setEvents).catch((e) => setError(e.message));
+    let active = true;
+
+    async function load() {
+      try {
+        const data = await getEvents();
+
+        if (active) {
+          setEvents(data);
+        }
+      } catch (err) {
+        if (active) {
+          setError(err.message);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    load();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  if (error) return <p className="error">{error}</p>;
+  if (loading) return <p>Loading events...</p>;
+  if (error) return <p className="error" role="alert">{error}</p>;
 
   return (
     <>
-      <h1>Events</h1>
-      <div className="grid">
-        {events.map((e) => (
-          <div className="card" key={e.id}>
-            <h3>{e.name}</h3>
-            <p>{e.description}</p>
-            <div className="row">
-              <strong>{formatMoney(e.priceCents)}</strong>
-              <button disabled={e.capacity < 1} onClick={() => addToCart(e)}>
-                {e.capacity < 1 ? 'Sold out' : 'Add to cart'}
-              </button>
-            </div>
-            <small>{e.capacity} spots available</small>
-          </div>
-        ))}
-      </div>
+      <h1>Upcoming events</h1>
+
+      {events.length === 0 ? (
+        <p>No upcoming events.</p>
+      ) : (
+        <div className="grid">
+          {events.map((event) => {
+            const soldOut = event.seatsLeft < 1;
+
+            return (
+              <article className="card" key={event.id}>
+                <h2>{event.title}</h2>
+
+                <p>{event.description}</p>
+                <p>{event.location}</p>
+
+                <p>
+                  <time dateTime={event.startsAt}>
+                    {new Date(event.startsAt).toLocaleString()}
+                  </time>
+                </p>
+
+                <strong>{formatMoney(event.priceCents)}</strong>
+
+                <p>
+                  {soldOut
+                    ? "Sold out"
+                    : `${event.seatsLeft} seats left`}
+                </p>
+
+                <Link to={`/events/${event.id}`}>
+                  View event
+                </Link>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </>
   );
 }

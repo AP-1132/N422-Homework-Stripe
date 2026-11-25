@@ -1,25 +1,57 @@
-import { Link, Route, Routes } from 'react-router-dom';
-import { useCart } from './CartContext.jsx';
-import Cart from './pages/Cart.jsx';
-import Success from './pages/Success.jsx';
+import { Link, Route, Routes } from "react-router-dom";
+import Events from "./pages/Events.jsx";
+import EventDetails from "./pages/EventDetails.jsx";
+import Payment from "./pages/Payment.jsx";
+import Success from "./pages/Success.jsx";
+import Registrations from "./pages/Registrations.jsx";
 
 export default function App() {
-  const { count } = useCart();
   return (
     <>
       <header className="nav">
-        <Link to="/" className="brand">Campus Events</Link>
+        <Link to="/" className="brand">
+          Campus Events
+        </Link>
+
         <nav>
-          <Link to="/registrations">Registrations</Link>
-          <Link to="/cart">Cart ({count})</Link>
+          <Link to="/">Events</Link>
+          <Link to="/tickets">My Tickets</Link>
         </nav>
       </header>
+
       <main className="container">
         <Routes>
           <Route path="/" element={<Events />} />
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/success" element={<Success />} />
-          <Route path="/registrations" element={<Registrations />} />
+
+          <Route
+            path="/events/:id"
+            element={<EventDetails />}
+          />
+
+          <Route
+            path="/payment/:registrationId"
+            element={<Payment />}
+          />
+
+          <Route
+            path="/confirmation/:registrationId"
+            element={<Success />}
+          />
+
+          <Route
+            path="/tickets"
+            element={<Registrations />}
+          />
+
+          <Route
+            path="*"
+            element={
+              <>
+                <h1>Page not found</h1>
+                <Link to="/">Return to events</Link>
+              </>
+            }
+          />
         </Routes>
       </main>
     </>

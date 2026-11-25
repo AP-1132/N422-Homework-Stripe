@@ -31,8 +31,11 @@ model Registration {
   attendeeEmail   String
   quantity        Int      @default(1)
   totalCents      Int
-  status          String   @default("PENDING")
-  paymentIntentId String?
+  status          String
+  paymentIntentId String?  @unique
+  stripeSessionId String?
   createdAt       DateTime @default(now())
   event           Event    @relation(fields: [eventId], references: [id])
+
+  @@index([stripeSessionId])
 }

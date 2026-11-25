@@ -1,20 +1,40 @@
 const API = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
 
 async function request(path, options = {}) {
-  const res = await fetch(`${API}${path}`, {
-    headers: { "Content-Type": "application/json" },
+  const response = await fetch(`${API}${path}`, {
     ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "Request failed");
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || "Request failed");
+  }
+
   return data;
 }
 
 export const getEvents = () => request("/events");
-export const getRegistrations = () => request("/registrations");
-export const getRegistrationsBySession = (sessionId) =>
-  request(`/registrations/by-session/${sessionId}`);
-export const refundRegistration = (id) =>
-  request(`/registrations/${id}/refund`, { method: "POST" });
-export const createCheckout = (items) =>
-  request("/checkout", { method: "POST", body: JSON.stringify({ items }) });
+
+export const getEvent = (id) => request(`/events/${encodeURIComponent(id)}`);
+
+export const createPaymentIntent = (eventId, attendee) =>
+  request(`/events/${encodeURIComponent(eventId)}/payment-intent`, {
+    method: "POST",
+    body: JSON.stringify(attendee),
+  });
+
+export const getRegistration = (id) =>
+  request(`/registrations/${encodeURIComponent(id)}`);
+
+export const getRegistrations = (email) =>
+  request(`/registrations?email=${encodeURIComponent(email)}`);
+
+export const cancelRegistration = (id) =>
+  request(`/registrations/${encodeURIComponent(id)}/cancel`, {
+    method: "POST",
+  });

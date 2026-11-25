@@ -1,50 +1,76 @@
 import { Router, raw } from "express";
 import { stripe } from "../stripe.js";
 import {
-  markRegistrationPaid,
-  markRegistrationExpired,
+  markRegistrationConfirmed,
+  markRegistrationFailed,
+  markRegistrationCancelled,
 } from "../registerService.js";
 
 const router = Router();
+
 router.post("/", raw({ type: "application/json" }), async (req, res) => {
+  const signature = req.headers["stripe-signature"];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    console.error("STRIPE_WEBHOOK_SECRET is not configured");
+
+    return res.status(500).json({
+      error: "Webhook is not configured",
+    });
+  }
+
+  if (typeof signature !== "string") {
+    return res.status(400).json({
+      error: "Missing Stripe signature",
+    });
+  }
+
   let event;
 
   try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      req.headers["stripe-signature"],
-      process.env.STRIPE_WEBHOOK_SECRET,
-    );
+    event = stripe.webhooks.constructEvent(req.body, signature, webhookSecret);
   } catch (err) {
-    console.error(err);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    console.error("Webhook verification failed:", err.message);
+
+    return res.status(400).json({
+      error: "Invalid webhook signature",
+    });
   }
 
   try {
-    switch (event?.type) {
-      case "checkout.session.completed": {
-        const session = event.data.object;
-        await markRegistrationPaid(Number(session.metadata.orderId), {
-          email: session.customer_details?.email ?? null,
-          paymentIntentId: session.payment_intent ?? null,
-        });
-        break;
-      }
+    switch (event.type) {
+      case "payment_intent.succeeded":
+      case "payment_intent.payment_failed":
+      case "payment_intent.canceled": {
+        const paymentIntent = event.data.object;
 
-      case "checkout.session.expired": {
-        await markRegistrationExpired(
-          Number(event.data.object.metadata.orderId),
-        );
+        if (!paymentIntent.metadata?.registrationId) {
+          break;
+        }
+
+        if (event.type === "payment_intent.succeeded") {
+          await markRegistrationConfirmed(paymentIntent);
+        } else if (event.type === "payment_intent.payment_failed") {
+          await markRegistrationFailed(paymentIntent);
+        } else {
+          await markRegistrationCancelled(paymentIntent);
+        }
+
         break;
       }
 
       default:
-        console.log(`Unhandled event type ${event?.type}`);
+        break;
     }
-    res.json({ received: true });
+
+    return res.json({ received: true });
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Webhook handler failed");
+    console.error(`Webhook processing failed for ${event.id}:`, err);
+
+    return res.status(500).json({
+      error: "Webhook processing failed",
+    });
   }
 });
 
